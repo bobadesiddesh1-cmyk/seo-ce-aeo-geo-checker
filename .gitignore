@@ -1,0 +1,15 @@
+# Dependencies (the extension itself has none; this guards local tooling)
+node_modules/
+package-lock.json
+package.json
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
+
+# Build/zip artifacts
+*.zip
+dist/
