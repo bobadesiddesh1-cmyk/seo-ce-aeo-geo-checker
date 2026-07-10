@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="popup.css">
+  <title>GEO Lens</title>
+</head>
+<body>
+  <header class="top">
+    <div class="logo" aria-hidden="true">
+      <span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span>
+      <span class="dot d4"></span><span class="dot d5"></span>
+    </div>
+    <div class="titles">
+      <h1>GEO Lens</h1>
+      <p>AEO / GEO content auditor</p>
+    </div>
+  </header>
+
+  <section id="current" class="current hidden">
+    <div class="ring" id="ring"><div class="hole"><b id="ringGrade">–</b><span id="ringScore"></span></div></div>
+    <div class="current-meta">
+      <div class="lbl">Last score for this page</div>
+      <div class="ttl" id="currentTitle"></div>
+      <div class="when" id="currentWhen"></div>
+    </div>
+  </section>
+
+  <button id="scanBtn" class="scan">Scan this page</button>
+  <div id="status" class="status hidden"></div>
+
+  <section class="recent">
+    <h2>Recent scans</h2>
+    <ul id="recentList" class="recent-list"></ul>
+    <p id="recentEmpty" class="recent-empty">No scans yet. Open an article and scan it.</p>
+  </section>
+
+  <footer class="foot">
+    <span class="lock">●</span> 100% local analysis — no data leaves your browser
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
