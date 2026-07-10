@@ -67,13 +67,16 @@ Built for SEO professionals and content writers optimising for Answer Engine Opt
 - **Store icon** — `geo-lens/icons/icon128.png` (128×128). ✅ included.
 - **Small promo tile (440×280)** — `store/promo-tile-440x280.png`. ✅ included (optional but recommended).
 - **Marquee promo (1400×560)** — `store/promo-marquee-1400x560.png`. ✅ included (optional).
-- **Screenshots (1280×800 or 640×400, at least one, up to five)** — **[you provide]**.
-  Take these from the running extension:
-  1. Load the extension (chrome://extensions → Load unpacked → `geo-lens`).
-  2. Open a real article (a Wikipedia page or a blog post works well).
-  3. Click Scan. Capture: (a) the side panel with the score + issues, (b) the
-     page with colour highlights visible, (c) the popup with a recent-scan list.
-  4. Crop/resize each to exactly 1280×800 (or 640×400).
+- **Screenshots (1280×800, at least one, up to five)** — ✅ three ready-to-upload
+  screenshots are included in `store/screenshots/`:
+  - `01-panel-and-highlights.png` — article with colour highlights + scored panel
+  - `02-popup-and-pitch.png` — popup with score and recent scans
+  - `03-exported-report.png` — the exported HTML audit report
+  These are polished representative mockups built from the real UI and the real
+  report generator, and are fine to submit as-is. **Recommended:** also capture a
+  couple of real screenshots from your own scans later (open the extension, scan
+  an article, screenshot the panel) and swap them in — real captures of live
+  pages tend to convert best. Any replacement must also be exactly 1280×800.
 
 ---
 
@@ -132,7 +135,7 @@ Distribution → choose **Public** (or Unlisted while you test), then
 - [ ] Registered as a Chrome Web Store developer ($5 one-time fee).
 - [ ] `geo-lens.zip` uploaded (manifest at zip root).
 - [ ] Title, summary, description filled from section 2.
-- [ ] Icon 128 + at least one 1280×800 screenshot uploaded.
+- [ ] Icon 128 + at least one 1280×800 screenshot uploaded (three are in `store/screenshots/`).
 - [ ] Single purpose + all four permission justifications filled.
 - [ ] Data-usage form completed and three compliance boxes certified.
 - [ ] Privacy policy URL is public and loads.
