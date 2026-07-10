@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "GEO Lens — AEO/GEO Content Auditor",
   "version": "1.0.0",
-  "description": "Scan any page for AI-search visibility issues (AI Overviews, ChatGPT, Perplexity, Gemini). Inline highlights + scored audit. 100% local.",
+  "description": "Scan any page for AI-search (AEO/GEO) issues: inline highlights and a scored audit with fixes. 100% local, no data collected.",
   "permissions": ["activeTab", "scripting", "storage", "downloads"],
   "action": {
     "default_title": "GEO Lens — Scan this page",
