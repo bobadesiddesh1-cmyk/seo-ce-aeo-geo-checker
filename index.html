@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GEO Lens — AEO/GEO Content Auditor</title>
+  <meta name="description" content="A Chrome extension that scans any page for AI-search visibility issues (AI Overviews, ChatGPT, Perplexity, Gemini) and highlights them inline with a scored AEO/GEO audit. 100% local.">
+  <style>
+    :root { --red:#EF4444; --orange:#F97316; --yellow:#EAB308; --blue:#3B82F6; --purple:#A855F7; --accent:#4F46E5; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #16181d; background: #fff; line-height: 1.6; }
+    .hero { background: linear-gradient(135deg, #4F46E5, #9333EA); color: #fff; padding: 72px 22px 60px; text-align: center; }
+    .logo { width: 64px; height: 64px; border-radius: 16px; background: rgba(255,255,255,.14); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px; }
+    .logo .lens { width: 30px; height: 30px; border: 5px solid #fff; border-radius: 50%; position: relative; }
+    .logo .lens::after { content: ''; position: absolute; width: 10px; height: 10px; background: var(--red); border-radius: 50%; top: 5px; left: 5px; }
+    h1 { font-size: 34px; letter-spacing: -0.02em; }
+    .tag { font-size: 17px; opacity: .92; margin-top: 10px; max-width: 640px; margin-left: auto; margin-right: auto; }
+    .dots { margin-top: 22px; display: flex; gap: 8px; justify-content: center; }
+    .dots i { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 44px 22px 70px; }
+    h2 { font-size: 20px; margin: 34px 0 12px; }
+    .cats { display: grid; gap: 10px; }
+    .cat { display: flex; gap: 12px; align-items: flex-start; border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px 14px; }
+    .cat .sw { width: 12px; height: 12px; border-radius: 3px; margin-top: 6px; flex: 0 0 auto; }
+    .cat b { font-size: 14px; } .cat p { font-size: 13px; color: #5b6572; }
+    .links a { display: inline-block; margin: 6px 10px 6px 0; color: var(--accent); font-weight: 600; text-decoration: none; }
+    .links a:hover { text-decoration: underline; }
+    footer { border-top: 1px solid #e5e7eb; padding: 22px; text-align: center; color: #9ca3af; font-size: 13px; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #0f1115; color: #e5e7eb; }
+      .cat { border-color: #232a36; } .cat p { color: #9aa4b2; }
+      footer { border-color: #232a36; }
+    }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <div class="logo"><span class="lens"></span></div>
+    <h1>GEO Lens</h1>
+    <p class="tag">Scan any page for AI-search visibility issues — AI Overviews, ChatGPT, Perplexity, Gemini — with inline colour highlights and a scored AEO/GEO audit. 100% local.</p>
+    <div class="dots">
+      <i style="background:var(--red)"></i><i style="background:var(--orange)"></i>
+      <i style="background:var(--yellow)"></i><i style="background:var(--blue)"></i>
+      <i style="background:var(--purple)"></i>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <h2>What it checks</h2>
+    <div class="cats">
+      <div class="cat"><span class="sw" style="background:var(--red)"></span><div><b>Extractability</b><p>Direct-answer readiness: walls of text, unanswered question headings, buried definitions, missing summaries.</p></div></div>
+      <div class="cat"><span class="sw" style="background:var(--orange)"></span><div><b>Structure</b><p>H1 usage, heading hierarchy, question headings, lists vs prose, comparison tables, table of contents.</p></div></div>
+      <div class="cat"><span class="sw" style="background:var(--yellow)"></span><div><b>Entity &amp; E-E-A-T</b><p>Author, dates, sourced claims, first-hand experience, entity consistency.</p></div></div>
+      <div class="cat"><span class="sw" style="background:var(--blue)"></span><div><b>Schema</b><p>JSON-LD coverage: Article, FAQPage, HowTo, and broken markup.</p></div></div>
+      <div class="cat"><span class="sw" style="background:var(--purple)"></span><div><b>Citability</b><p>Vague quantifiers, outbound sources, quotable stat-sentences, hedged claims.</p></div></div>
+    </div>
+
+    <h2>Links</h2>
+    <p class="links">
+      <a href="./store/privacy-policy.html">Privacy Policy</a>
+      <a href="https://github.com/bobadesiddesh1-cmyk/seo-ce-aeo-geo-checker">Source on GitHub</a>
+      <a href="./geo-lens/README.md">Documentation</a>
+    </p>
+
+    <h2>Privacy</h2>
+    <p>Everything runs locally in your browser. No account, no API key, no network calls, and no data ever leaves the page.</p>
+  </div>
+
+  <footer>GEO Lens — AEO/GEO Content Auditor · 100% local analysis</footer>
+</body>
+</html>
