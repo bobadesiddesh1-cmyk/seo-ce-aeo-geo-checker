@@ -15,6 +15,8 @@ const els = {
   currentWhen: document.getElementById('currentWhen'),
   recentList: document.getElementById('recentList'),
   recentEmpty: document.getElementById('recentEmpty'),
+  currentBadges: document.getElementById('currentBadges'),
+  openOptions: document.getElementById('openOptions'),
 };
 
 let activeTab = null;
@@ -31,6 +33,11 @@ async function init() {
   }
 
   els.scanBtn.addEventListener('click', doScan);
+  els.openOptions.addEventListener('click', function (e) {
+    e.preventDefault();
+    if (chrome.runtime.openOptionsPage) chrome.runtime.openOptionsPage();
+    else chrome.tabs.create({ url: chrome.runtime.getURL('options/options.html') });
+  });
 
   const data = await sendMessage({ type: 'GEO_GET_RECENT', url: url });
   if (data) {
@@ -81,7 +88,10 @@ async function doScan() {
     renderCurrent(null);
     return;
   }
-  setStatus('Scan complete — ' + s.issueCount + ' issue' + (s.issueCount === 1 ? '' : 's') + ' found. See the panel on the page.', 'ok');
+  const bits = [s.issueCount + ' issue' + (s.issueCount === 1 ? '' : 's')];
+  if (s.quotableCount != null) bits.push(s.quotableCount + ' quotable');
+  if (s.orphanCount) bits.push(s.orphanCount + ' orphan chunk' + (s.orphanCount === 1 ? '' : 's'));
+  setStatus('Scan complete — ' + bits.join(', ') + '. See the panel on the page.', 'ok');
   renderCurrent(s);
   const data = await sendMessage({ type: 'GEO_GET_RECENT', url: activeTab.url });
   if (data) renderRecent(data.recent || []);
@@ -108,7 +118,26 @@ function renderCurrent(s) {
   els.ringScore.textContent = s.score + '/100';
   els.currentTitle.textContent = s.title || s.url || '';
   els.currentWhen.textContent = relTime(s.timestamp);
+  renderBadges(s);
   els.current.classList.remove('hidden');
+}
+
+function renderBadges(s) {
+  els.currentBadges.textContent = '';
+  if (s.profileLabel || s.profile) {
+    els.currentBadges.appendChild(badge('profile', s.profileLabel || s.profile));
+  }
+  const d = s.delta ? s.delta.scoreDelta : (typeof s.delta === 'number' ? s.delta : null);
+  if (d != null && d !== 0) {
+    els.currentBadges.appendChild(badge(d > 0 ? 'up' : 'down', (d > 0 ? '+' : '') + d + ' vs last scan'));
+  }
+}
+
+function badge(kind, text) {
+  const b = document.createElement('span');
+  b.className = 'badge ' + kind;
+  b.textContent = text;
+  return b;
 }
 
 function renderRecent(list) {

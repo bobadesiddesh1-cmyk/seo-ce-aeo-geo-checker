@@ -14,15 +14,17 @@
   if (NS.highlighter) return; // already injected
 
   // ---- shared category palette / weights (single source of truth) ---------
+  // Schema/on-page/technical checks deliberately live in SEO Sidekick, not here.
+  // GEO Lens owns the passage-level, editorial layer only. `weight` is the
+  // default (article) weighting; a content-type profile may override it.
   const CATEGORY_META = {
-    extractability: { label: 'Extractability', color: '#EF4444', bgAlpha: 0.18, weight: 0.25 },
-    structure:      { label: 'Structure',      color: '#F97316', bgAlpha: 0.18, weight: 0.25 },
+    extractability: { label: 'Extractability', color: '#EF4444', bgAlpha: 0.18, weight: 0.30 },
+    structure:      { label: 'Structure',      color: '#F97316', bgAlpha: 0.18, weight: 0.20 },
     entity:         { label: 'Entity & E-E-A-T', color: '#EAB308', bgAlpha: 0.22, weight: 0.20 },
-    schema:         { label: 'Schema',         color: '#3B82F6', bgAlpha: 0.18, weight: 0.15 },
-    citability:     { label: 'Citability',     color: '#A855F7', bgAlpha: 0.18, weight: 0.15 },
+    citability:     { label: 'Citability',     color: '#A855F7', bgAlpha: 0.18, weight: 0.30 },
   };
   NS.CATEGORY_META = CATEGORY_META;
-  NS.CATEGORY_ORDER = ['extractability', 'structure', 'entity', 'schema', 'citability'];
+  NS.CATEGORY_ORDER = ['extractability', 'structure', 'entity', 'citability'];
 
   function hexToRgba(hex, alpha) {
     const h = hex.replace('#', '');

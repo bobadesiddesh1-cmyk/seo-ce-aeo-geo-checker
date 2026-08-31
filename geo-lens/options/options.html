@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="options.css">
+  <title>GEO Lens — Settings</title>
+</head>
+<body>
+<main class="wrap">
+  <header class="head">
+    <h1>GEO Lens settings</h1>
+    <p>Every threshold the rules use, and the branding on your exported reports. Stored locally; nothing is synced or sent anywhere.</p>
+  </header>
+
+  <section class="card">
+    <h2>Content-type profile</h2>
+    <p class="hint">A product page and a long-form article should not be graded by the same rubric. Auto-detect uses structured data, the URL, then DOM signals.</p>
+    <label class="row">
+      <span class="lbl">Profile</span>
+      <select id="profile">
+        <option value="auto">Auto-detect (recommended)</option>
+        <option value="article">Always Article</option>
+        <option value="product">Always Product page</option>
+        <option value="docs">Always Documentation</option>
+        <option value="homepage">Always Homepage</option>
+      </select>
+    </label>
+  </section>
+
+  <section class="card">
+    <h2>Rule thresholds</h2>
+    <label class="row">
+      <span class="lbl">Wall-of-text paragraph length <em>(words)</em></span>
+      <input type="number" id="longParagraphWords" min="40" max="500" step="5">
+    </label>
+    <label class="row">
+      <span class="lbl">Maximum words in a direct answer sentence</span>
+      <input type="number" id="answerSentenceWords" min="10" max="80" step="1">
+    </label>
+    <label class="row">
+      <span class="lbl">Minimum share of H2s phrased as questions <em>(%)</em></span>
+      <input type="number" id="questionHeadingRatio" min="0" max="100" step="5">
+    </label>
+    <label class="row">
+      <span class="lbl">Word count above which a page needs a TOC</span>
+      <input type="number" id="tocMinWords" min="300" max="10000" step="100">
+    </label>
+  </section>
+
+  <section class="card">
+    <h2>Scan behaviour</h2>
+    <label class="row">
+      <span class="lbl">Maximum inline highlights</span>
+      <input type="number" id="maxHighlights" min="10" max="300" step="10">
+    </label>
+    <label class="row">
+      <span class="lbl">Retrieval chunk size <em>(tokens)</em></span>
+      <input type="number" id="chunkTokens" min="100" max="2000" step="50">
+    </label>
+    <label class="row">
+      <span class="lbl">Quotable passages to surface</span>
+      <input type="number" id="quotableCount" min="1" max="20" step="1">
+    </label>
+  </section>
+
+  <section class="card">
+    <h2>Scoring</h2>
+    <p class="hint">Points deducted from a category (which starts at 100) per issue found.</p>
+    <label class="row">
+      <span class="lbl">High severity</span>
+      <input type="number" id="dedHigh" min="1" max="50" step="1">
+    </label>
+    <label class="row">
+      <span class="lbl">Medium severity</span>
+      <input type="number" id="dedMedium" min="1" max="50" step="1">
+    </label>
+    <label class="row">
+      <span class="lbl">Low severity</span>
+      <input type="number" id="dedLow" min="1" max="50" step="1">
+    </label>
+  </section>
+
+  <section class="card">
+    <h2>Report branding</h2>
+    <p class="hint">Appears on the exported HTML report you send to a client.</p>
+    <label class="row">
+      <span class="lbl">Agency name</span>
+      <input type="text" id="agency" placeholder="Your agency" maxlength="60">
+    </label>
+    <label class="row">
+      <span class="lbl">Client name</span>
+      <input type="text" id="client" placeholder="Client name" maxlength="60">
+    </label>
+    <label class="row">
+      <span class="lbl">Accent colour</span>
+      <input type="color" id="accent">
+    </label>
+  </section>
+
+  <section class="card">
+    <h2>Dismissed issues</h2>
+    <p class="hint" id="dismissSummary">Loading…</p>
+    <button id="clearDismissals" class="btn danger">Clear all dismissals</button>
+  </section>
+
+  <div class="actions">
+    <button id="save" class="btn primary">Save settings</button>
+    <button id="reset" class="btn">Reset to defaults</button>
+    <span id="status" class="status"></span>
+  </div>
+</main>
+<script src="options.js"></script>
+</body>
+</html>

@@ -37,11 +37,10 @@
   <div class="hero">
     <div class="logo"><span class="lens"></span></div>
     <h1>GEO Lens</h1>
-    <p class="tag">Scan any page for AI-search visibility issues — AI Overviews, ChatGPT, Perplexity, Gemini — with inline colour highlights and a scored AEO/GEO audit. 100% local.</p>
+    <p class="tag">Scan any page for AI-search visibility issues — AI Overviews, ChatGPT, Perplexity, Gemini — with inline colour highlights, a scored AEO/GEO audit, and the corrected text to paste in. 100% local.</p>
     <div class="dots">
       <i style="background:var(--red)"></i><i style="background:var(--orange)"></i>
-      <i style="background:var(--yellow)"></i><i style="background:var(--blue)"></i>
-      <i style="background:var(--purple)"></i>
+      <i style="background:var(--yellow)"></i><i style="background:var(--purple)"></i>
     </div>
   </div>
 
@@ -49,11 +48,19 @@
     <h2>What it checks</h2>
     <div class="cats">
       <div class="cat"><span class="sw" style="background:var(--red)"></span><div><b>Extractability</b><p>Direct-answer readiness: walls of text, unanswered question headings, buried definitions, missing summaries.</p></div></div>
-      <div class="cat"><span class="sw" style="background:var(--orange)"></span><div><b>Structure</b><p>H1 usage, heading hierarchy, question headings, lists vs prose, comparison tables, table of contents.</p></div></div>
-      <div class="cat"><span class="sw" style="background:var(--yellow)"></span><div><b>Entity &amp; E-E-A-T</b><p>Author, dates, sourced claims, first-hand experience, entity consistency.</p></div></div>
-      <div class="cat"><span class="sw" style="background:var(--blue)"></span><div><b>Schema</b><p>JSON-LD coverage: Article, FAQPage, HowTo, and broken markup.</p></div></div>
+      <div class="cat"><span class="sw" style="background:var(--orange)"></span><div><b>Structure</b><p>Question headings, lists vs prose, comparison tables, table of contents.</p></div></div>
+      <div class="cat"><span class="sw" style="background:var(--yellow)"></span><div><b>Entity &amp; E-E-A-T</b><p>Sourced claims, first-hand experience, entity consistency in the opening.</p></div></div>
       <div class="cat"><span class="sw" style="background:var(--purple)"></span><div><b>Citability</b><p>Vague quantifiers, outbound sources, quotable stat-sentences, hedged claims.</p></div></div>
     </div>
+
+    <h2>It writes the fix</h2>
+    <p>Every mechanically-correctable issue comes with generated replacement text and a Copy button — a wall of text split at real sentence boundaries, a hedge stripped from a claim, a comma run turned into list markup, a comparison table skeleton naming both options. Where a real rewrite would require facts the page doesn&rsquo;t state, you get a clearly-labelled skeleton, never invented content.</p>
+
+    <h2>Two more views</h2>
+    <p><b>Quotable</b> ranks the sentences an engine is most likely to lift verbatim — and says plainly when none qualify. <b>Retrieval</b> shows how the page splits into chunks and flags the orphans: passages that lose their subject once retrieved alone.</p>
+
+    <h2>Scope</h2>
+    <p>GEO Lens audits the editorial layer only — the prose itself. Titles, meta descriptions, H1 counts, canonicals, schema validity and crawler access are on-page and technical SEO, handled by the companion <a href="https://github.com/bobadesiddesh1-cmyk/seo-sidekick">SEO Sidekick</a>.</p>
 
     <h2>Links</h2>
     <p class="links">
