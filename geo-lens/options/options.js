@@ -30,6 +30,7 @@ function fill(settings) {
   NUMBER_FIELDS.forEach(function (k) { $(k).value = settings[k]; });
   $('questionHeadingRatio').value = Math.round((settings.questionHeadingRatio || 0) * 100);
   $('profile').value = settings.profile || 'auto';
+  $('ai').checked = settings.ai !== false;
   $('dedHigh').value = settings.deductions.High;
   $('dedMedium').value = settings.deductions.Medium;
   $('dedLow').value = settings.deductions.Low;
@@ -51,6 +52,7 @@ function collect() {
   NUMBER_FIELDS.forEach(function (k) { out[k] = clampInt($(k), defaults[k]); });
   out.questionHeadingRatio = clampInt($('questionHeadingRatio'), 30) / 100;
   out.profile = $('profile').value;
+  out.ai = $('ai').checked;
   out.deductions.High = clampInt($('dedHigh'), defaults.deductions.High);
   out.deductions.Medium = clampInt($('dedMedium'), defaults.deductions.Medium);
   out.deductions.Low = clampInt($('dedLow'), defaults.deductions.Low);
@@ -89,12 +91,28 @@ async function loadDismissSummary() {
       : 'Nothing dismissed yet.';
 }
 
+const AI_STATUS_TEXT = {
+  readily: 'Available \u2014 the on-device model is downloaded and ready.',
+  'after-download': 'Available \u2014 Chrome will download the model (about 2 GB) on your first scan.',
+  downloading: 'Chrome is downloading the on-device model now. Re-scan when it finishes.',
+  unavailable: 'Not available on this machine \u2014 usually not enough free disk space, or unsupported hardware.',
+  unsupported: 'Not supported by this browser. Needs Chrome 138 or later on desktop.',
+};
+
+async function loadAiStatus() {
+  const resp = await send({ type: 'GEO_AI_STATUS' });
+  const el = $('aiStatus');
+  if (!resp) { el.textContent = 'Could not check availability.'; return; }
+  el.textContent = AI_STATUS_TEXT[resp.state] || ('Status: ' + resp.state);
+}
+
 async function init() {
   const resp = await send({ type: 'GEO_GET_SETTINGS' });
   if (!resp) { status('Could not load settings.', 'err'); return; }
   defaults = resp.defaults;
   fill(resp.settings);
   loadDismissSummary();
+  loadAiStatus();
 
   $('save').addEventListener('click', async function () {
     const ok = await send({ type: 'GEO_SET_SETTINGS', settings: collect() });
@@ -110,6 +128,7 @@ async function init() {
   $('clearDismissals').addEventListener('click', async function () {
     await send({ type: 'GEO_CLEAR_DISMISSALS' });
     loadDismissSummary();
+  loadAiStatus();
     status('All dismissals cleared.', 'ok');
   });
 }

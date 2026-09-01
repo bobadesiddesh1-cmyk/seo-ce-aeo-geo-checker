@@ -6,8 +6,17 @@
  * content world never has to await storage; and download the exported report.
  *
  * All storage is chrome.storage.local. Nothing is synced or sent anywhere.
+ *
+ * The AI layer lives here too, because Chrome's `LanguageModel` (Gemini Nano,
+ * on-device) is exposed to extension contexts but NOT to content scripts. The
+ * content script posts its scan result to GEO_AI_ENHANCE and merges the reply.
  */
 'use strict';
+
+// Chrome's built-in Prompt API runs on-device, so loading this keeps the
+// extension's "no network" guarantee intact. importScripts is top-level and
+// synchronous, as MV3 classic service workers require.
+importScripts('ai/engine.js');
 
 // Injection order matters: highlighter (owns the namespace + palette) → util →
 // settings → profiles → rules → fixers → quotables → chunks → report → panel →
@@ -22,6 +31,7 @@ const CONTENT_FILES = [
   'content/rules/entity.js',
   'content/rules/citability.js',
   'content/fixers.js',
+  'content/ai-bridge.js',
   'content/quotables.js',
   'content/chunks.js',
   'report/report-template.js',
@@ -47,6 +57,7 @@ const DEFAULT_SETTINGS = {
   deductions: { High: 15, Medium: 8, Low: 3 },
   branding: { agency: '', client: '', accent: '#4F46E5' },
   profile: 'auto',
+  ai: true,
 };
 
 const RESTRICTED = /^(chrome|edge|brave|about|view-source|chrome-extension|moz-extension|devtools|data):|^https?:\/\/(chrome\.google\.com\/webstore|chromewebstore\.google\.com)/i;
@@ -126,6 +137,12 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
       return true;
     case 'GEO_GET_HISTORY':
       getHistoryFor(msg.url).then(function (h) { sendResponse({ history: h }); });
+      return true;
+    case 'GEO_AI_ENHANCE':
+      handleAiEnhance(msg.payload, tabId).then(sendResponse);
+      return true;
+    case 'GEO_AI_STATUS':
+      aiStatus().then(sendResponse);
       return true;
     default:
       return;
@@ -292,6 +309,41 @@ async function dismissRule(url, ruleId) {
 async function clearDismissals() {
   await set('dismissedRules', {});
   await set('dismissedIssues', {});
+}
+
+// ---- AI ------------------------------------------------------------------
+async function aiStatus() {
+  const state = await self.GEO_AI.availability(true);
+  return { state: state, supported: self.GEO_AI.has() };
+}
+
+async function handleAiEnhance(payload, tabId) {
+  try {
+    const settings = await getSettings();
+    if (settings.ai === false) {
+      return { available: false, state: 'off', rewrites: {}, insights: [] };
+    }
+    // Report the model's first-run download to the panel so a 2GB fetch is
+    // never a silent stall.
+    const onProgress = function (loaded) {
+      if (tabId == null) return;
+      try {
+        chrome.tabs.sendMessage(tabId, {
+          type: 'GEO_AI_PROGRESS',
+          loaded: loaded,
+        });
+      } catch (e) { /* panel closed */ }
+    };
+    return await self.GEO_AI.enhance(payload, onProgress);
+  } catch (e) {
+    return {
+      available: false,
+      state: 'error',
+      error: String(e && e.message ? e.message : e),
+      rewrites: {},
+      insights: [],
+    };
+  }
 }
 
 // ---- entry points: toolbar shortcut + context menu + first run ------------

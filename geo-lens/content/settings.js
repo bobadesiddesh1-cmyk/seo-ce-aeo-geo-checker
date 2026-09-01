@@ -30,6 +30,10 @@
     branding: { agency: '', client: '', accent: '#4F46E5' },
     // Content-type profile: 'auto' or an explicit profile id.
     profile: 'auto',
+    // Use Chrome's on-device model to write real rewrites and run the
+    // semantic checks. Falls back to the deterministic fixers when the model
+    // is unavailable, so turning this off never breaks a scan.
+    ai: true,
   };
 
   function mergeSettings(saved) {

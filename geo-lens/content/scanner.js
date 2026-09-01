@@ -279,6 +279,7 @@
       wordCount: result.wordCount,
       truncated: result.truncated,
       delta: result.delta,
+      aiPending: result.aiPending === true,
       noContent: false,
     };
   }
@@ -360,11 +361,23 @@
       retrieval: NS.chunks.build(ctx),
       branding: settings.branding,
       delta: null,
+      ai: null,
+      aiPending: settings.ai !== false,
     };
     result.delta = buildDelta(opts.previous, issues, scoring);
 
     NS.lastResult = result;
     if (NS.panel) NS.panel.render(result);
+
+    // Intelligence pass. Deliberately after render and deliberately not
+    // awaited: the deterministic result is on screen immediately, and the
+    // model's output — which on a first run may involve a multi-gigabyte
+    // download — repaints the panel whenever it arrives.
+    if (settings.ai !== false && NS.aiBridge) {
+      try { NS.aiBridge.request(result, ctx); }
+      catch (e) { console.warn('GEO Lens: AI pass failed to start', e); }
+    }
+
     return summarize(result);
   }
 
