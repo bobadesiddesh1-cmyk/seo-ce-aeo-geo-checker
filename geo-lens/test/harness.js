@@ -15,12 +15,14 @@ const FILES = [
   'content/highlighter.js', 'content/util.js', 'content/settings.js',
   'content/profiles.js', 'content/rules/extractability.js',
   'content/rules/structure.js', 'content/rules/entity.js',
-  'content/rules/citability.js', 'content/fixers.js', 'content/quotables.js',
+  'content/rules/citability.js', 'content/fixers.js', 'content/ai-bridge.js',
+  'content/quotables.js',
   'content/chunks.js', 'report/report-template.js', 'content/panel.js',
   'content/scanner.js',
 ];
 
 let pass = 0, fail = 0;
+async function main() {
 function check(name, cond, extra) {
   if (cond) { pass++; console.log('  PASS  ' + name); }
   else { fail++; console.log('  FAIL  ' + name + (extra ? '  → ' + extra : '')); }
@@ -327,6 +329,198 @@ console.log('\n=== 11. Edge cases ===');
   check('page without H1 still scans', typeof noH1.summary.score === 'number');
 }
 
+console.log('\n=== 11b. AI engine: grounding guard ===');
+{
+  // The engine runs in the service worker, so load it into a plain VM context
+  // with a `self` global, the way importScripts would.
+  const sandbox = { self: {}, console: console };
+  sandbox.self.console = console;
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'ai/engine.js'), 'utf8'), sandbox, { filename: 'ai/engine.js' });
+  const AI = sandbox.self.GEO_AI;
+
+  check('engine exposes GEO_AI', !!AI && typeof AI.enhance === 'function');
+
+  const src = 'DNS caching cuts lookup time to 20 milliseconds across 4 server types.';
+  check('accepts a figure present in the source',
+        AI.groundingViolation('Lookups take 20 milliseconds.', src) === null);
+  check('REJECTS an invented statistic',
+        AI.groundingViolation('DNS failures cost businesses 47% of revenue.', src) === '47%',
+        String(AI.groundingViolation('DNS failures cost businesses 47% of revenue.', src)));
+  check('rejects an invented year',
+        AI.groundingViolation('It was standardised in 1983.', src) === '1983');
+  check('allows bracketed placeholders through',
+        AI.groundingViolation('Costs fell by [specific figure] last year.', src) === null);
+  check('ignores commas in figures',
+        AI.groundingViolation('Across 4 server types.', 'handles 4 server types') === null);
+  check('no false positive on figure-free text',
+        AI.groundingViolation('DNS turns a name into an address.', src) === null);
+  check('availability() reports unsupported without LanguageModel',
+        typeof AI.availability === 'function');
+}
+
+console.log('\n=== 11c. AI engine: enhance() against a mock model ===');
+{
+  // A mock LanguageModel standing in for Gemini Nano, so the whole enhance()
+  // path is exercised without Chrome.
+  function makeAI(opts) {
+    const sandbox = { self: {}, console: console };
+    vm.createContext(sandbox);
+    if (opts.availability !== 'absent') {
+      sandbox.LanguageModel = {
+        availability: async () => opts.availability,
+        params: async () => ({ defaultTopK: 3, maxTopK: 8, defaultTemperature: 1, maxTemperature: 2 }),
+        create: async () => ({
+          prompt: async (text) => opts.reply(text),
+          destroy: async () => { sandbox._destroyed = true; },
+        }),
+      };
+    }
+    vm.runInContext(fs.readFileSync(path.join(ROOT, 'ai/engine.js'), 'utf8'), sandbox, { filename: 'ai/engine.js' });
+    return { AI: sandbox.self.GEO_AI, sandbox };
+  }
+
+  const PAYLOAD = {
+    title: 'What is DNS?',
+    url: 'https://example.com/dns',
+    entity: 'DNS',
+    articleText: 'DNS turns a domain name into an IP address. A resolver queries 4 server types.',
+    sections: ['How does DNS resolution work?'],
+    jobs: [
+      { id: 'extractability-0', kind: 'directAnswer', heading: 'How does DNS resolution work?',
+        passage: 'A resolver queries 4 server types in order before returning an address.' },
+      { id: 'verify-1', kind: 'verifyAnswer', heading: 'Why does DNS matter?',
+        passage: 'Networking has a long and storied history worth appreciating.', nodeRef: 'verify-1' },
+    ],
+  };
+
+  // -- unavailable model
+  {
+    const { AI } = makeAI({ availability: 'unavailable', reply: () => '{}' });
+    const out = await AI.enhance(PAYLOAD);
+    check('unavailable model returns available:false', out.available === false);
+    check('unavailable model yields no rewrites', Object.keys(out.rewrites).length === 0);
+    check('unavailable model yields no insights', out.insights.length === 0);
+  }
+
+  // -- no LanguageModel at all (older Chrome)
+  {
+    const { AI } = makeAI({ availability: 'absent', reply: () => '{}' });
+    check('reports unsupported when API is absent', (await AI.availability()) === 'unsupported');
+    const out = await AI.enhance(PAYLOAD);
+    check('absent API degrades cleanly', out.available === false && out.state === 'unsupported');
+  }
+
+  // -- healthy model
+  {
+    const { AI } = makeAI({
+      availability: 'readily',
+      reply: (t) => {
+        if (t.includes('Write a direct answer')) return JSON.stringify({ text: 'A resolver queries 4 server types in order.' });
+        if (t.includes('Does this passage actually answer')) return JSON.stringify({ answered: false, why: 'It gives history, not a reason.' });
+        if (t.includes('never supports')) return JSON.stringify({ claims: [{ quote: 'Networking has a long and storied history', missing: 'no source' }] });
+        if (t.includes('arrives with questions')) return JSON.stringify({ questions: ['How much does DNS caching cost?'] });
+        return JSON.stringify({ text: 'x' });
+      },
+    });
+    const out = await AI.enhance(PAYLOAD);
+    check('healthy model reports available', out.available === true);
+    check('produced a written rewrite', !!out.rewrites['extractability-0'], JSON.stringify(out.rewrites));
+    check('rewrite is flagged as AI', out.rewrites['extractability-0'].ai === true);
+    check('rewrite text came from the model',
+          /resolver queries 4 server types/.test(out.rewrites['extractability-0'].text));
+    const kinds = out.insights.map(i => i.kind);
+    check('flagged the unanswered question', kinds.includes('unanswered'), kinds.join(','));
+    check('unanswered insight keeps its node ref',
+          out.insights.some(i => i.kind === 'unanswered' && i.nodeRef === 'verify-1'));
+    check('flagged an unsupported claim', kinds.includes('unsupported'));
+    check('flagged a reader question gap', kinds.includes('gap'));
+    check('stats counted accepted generations', out.stats.accepted > 0);
+  }
+
+  // -- model that fabricates: the rewrite must be DISCARDED
+  {
+    const { AI } = makeAI({
+      availability: 'readily',
+      reply: (t) => {
+        if (t.includes('Write a direct answer')) return JSON.stringify({ text: 'DNS resolution completes in 7 milliseconds for 92% of queries.' });
+        if (t.includes('Does this passage actually answer')) return JSON.stringify({ answered: true, why: 'ok' });
+        return JSON.stringify({ claims: [], questions: [] });
+      },
+    });
+    const out = await AI.enhance(PAYLOAD);
+    check('fabricated rewrite is discarded', !out.rewrites['extractability-0'],
+          JSON.stringify(out.rewrites));
+    check('fabrication is counted as ungrounded', out.stats.ungrounded > 0, JSON.stringify(out.stats));
+  }
+
+  // -- model returning junk
+  {
+    const { AI } = makeAI({ availability: 'readily', reply: () => 'not json at all' });
+    const out = await AI.enhance(PAYLOAD);
+    check('unparseable output does not throw', out.available === true);
+    check('unparseable output yields no rewrites', Object.keys(out.rewrites).length === 0);
+    check('unparseable output is counted as failed', out.stats.failed > 0);
+  }
+
+  // -- model that throws
+  {
+    const { AI } = makeAI({ availability: 'readily', reply: () => { throw new Error('model crashed'); } });
+    const out = await AI.enhance(PAYLOAD);
+    check('a throwing model does not break the pass', out.available === true);
+    check('no rewrites survive a throwing model', Object.keys(out.rewrites).length === 0);
+  }
+}
+
+console.log('\n=== 11d. AI bridge: payload and merge ===');
+{
+  const { w, result } = scan(ARTICLE);
+  const NS = w.__GEOLens;
+  check('bridge is loaded', !!NS.aiBridge);
+
+  // Rebuild a context the way the scanner does, to exercise buildPayload.
+  const ctx = {
+    headings: [], root: w.document.querySelector('article'),
+    plainText: 'Some article text about database migration.',
+  };
+  w.document.querySelectorAll('article h1, article h2, article h3').forEach((el) => {
+    ctx.headings.push({ el, level: +el.nodeName[1], text: el.textContent.trim() });
+  });
+
+  const built = NS.aiBridge.buildPayload(result, ctx);
+  check('payload carries a job list', Array.isArray(built.payload.jobs));
+  check('payload includes article text', !!built.payload.articleText);
+  check('only skeleton-kinds are sent for rewriting',
+        built.payload.jobs.filter(j => j.kind !== 'verifyAnswer')
+          .every(j => NS.aiBridge.AI_KINDS[j.kind]),
+        built.payload.jobs.map(j => j.kind).join(','));
+  check('mechanical fixes are NOT sent to the model',
+        !built.payload.jobs.some(j => ['splitParagraph','unhedge','enumerationToList','toc'].includes(j.kind)));
+  check('question headings are queued for semantic verification',
+        built.payload.jobs.some(j => j.kind === 'verifyAnswer'),
+        built.payload.jobs.map(j => j.kind).join(','));
+
+  // merge()
+  const target = result.issues.find(i => i.rewrite);
+  const before = target.rewrite.text;
+  NS.aiBridge.merge(result, {
+    available: true, state: 'readily',
+    rewrites: { [target.id]: { label: 'AI rewrite', format: 'text', text: 'A much better sentence.', ai: true } },
+    insights: [{ kind: 'gap', question: 'What does it cost?' }],
+    stats: { attempted: 2, accepted: 2, ungrounded: 0, failed: 0 },
+  }, {});
+  check('merge replaces the rewrite', target.rewrite.text === 'A much better sentence.');
+  check('merge keeps the deterministic fallback', target.deterministicRewrite.text === before);
+  check('merge attaches insights', result.ai.insights.length === 1);
+  check('merge records availability', result.ai.available === true);
+
+  const r2 = scan(ARTICLE).result;
+  NS.aiBridge.merge(r2, { available: false, state: 'unsupported', rewrites: {}, insights: [] }, {});
+  check('unavailable merge leaves rewrites untouched',
+        r2.issues.filter(i => i.rewrite).every(i => !i.rewrite.ai));
+  check('unavailable merge records the state', r2.ai.state === 'unsupported');
+}
+
 console.log('\n=== 12. Settings mirror (content vs service worker) ===');
 {
   const contentSrc = fs.readFileSync(path.join(ROOT, 'content/settings.js'), 'utf8');
@@ -362,3 +556,6 @@ console.log('\n' + '='.repeat(52));
 console.log(`  ${pass} passed, ${fail} failed`);
 console.log('='.repeat(52) + '\n');
 process.exit(fail ? 1 : 0);
+}
+
+main().catch((e) => { console.error('HARNESS CRASHED:', e); process.exit(1); });

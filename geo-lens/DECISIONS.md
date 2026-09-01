@@ -260,3 +260,86 @@ Every prose heuristic is English-only. Rather than silently mis-scoring other
 languages, a declared non-English `<html lang>` produces a notice in both the
 panel and the exported report saying the scores are unreliable. An *undeclared*
 lang is not warned about — that would fire on most of the web.
+
+
+---
+
+# v2.1 — the intelligence layer
+
+## Why on-device, and not a hosted model
+
+The obvious way to add real reasoning is a BYO-API-key call to a hosted model.
+It was rejected: the extension's single strongest claim is *"100% local, no
+network calls, nothing leaves the page"*, and that claim is load-bearing for an
+SEO tool people point at client pages under NDA. A hosted model would have
+traded the product's most credible property for capability.
+
+Chrome's **built-in Prompt API** (Gemini Nano) gives the capability without the
+trade: the model ships with the browser and runs on the user's device. No
+account, no API key, no request. The privacy story is unchanged, and the Web
+Store data-disclosure answers stay exactly as they were.
+
+## Why the service worker
+
+`LanguageModel` is exposed to extension contexts — service worker, popup, side
+panel — but **not to content scripts**. So the engine lives in `ai/engine.js`,
+loaded into the worker via `importScripts()`, and the content script posts it a
+job list over `GEO_AI_ENHANCE`.
+
+## Why the AI pass never blocks a scan
+
+`run()` renders the deterministic result and *then* fires the AI pass without
+awaiting it. A first-run model download is roughly 2 GB; a panel that stayed
+blank for that long would be worse than no AI. The panel repaints via
+`NS.panel.refresh()` when the model's output lands, and `NS.lastResult !==
+result` guards against a later scan being overwritten by an earlier scan's
+reply.
+
+## What is NOT sent to the model
+
+Only the four skeleton-shaped fixes — `directAnswer`, `tldr`, `nameEntity`,
+`questionHeadings` — plus the semantic answer checks. The exact mechanical
+transforms (paragraph splitting, hedge stripping, list markup, TOC generation,
+comparison tables) are already correct; handing them to a small model could only
+degrade them. The harness asserts this boundary.
+
+## Grounding
+
+Output from this tool gets pasted onto live client pages, so an invented
+statistic is a real harm, not a cosmetic flaw. Three constraints:
+
+1. A system prompt forbidding any fact not present in the passage, and requiring
+   the literal placeholder `[specific figure]` where the text supplies no number.
+2. `responseConstraint` JSON schemas on every call, so output shape is enforced
+   by the runtime rather than hoped for.
+3. `groundingViolation()` — a post-check that extracts every numeric token from
+   the generation and rejects the whole rewrite if any is absent from the source.
+   Bracketed placeholders are stripped before the check, since those are the
+   model correctly declining to guess.
+
+A rejected generation falls back to the deterministic fixer. **Silence beats
+fabrication**, and the Insights tab reports the rejection count so the behaviour
+is visible rather than hidden.
+
+## Why the semantic answer check duplicates a rule
+
+`extractability.unansweredQuestion` fires when a first sentence runs over 35
+words or opens with filler. That measures *shape*. A fluent 18-word sentence
+that never resolves the heading passes it cleanly — a false negative no regex
+can close. The AI check therefore runs over *every* question heading, including
+the ones the heuristic already passed, and reports through a separate `Insights`
+surface rather than mutating the score. Scores stay deterministic and
+reproducible; the model advises.
+
+## Budget
+
+`MAX_GENERATIONS = 14` per scan, passages clipped to 1,200 characters and
+whole-article prompts to 4,000. Gemini Nano is small and on-device; an unbounded
+pass over long-form content would take minutes and exhaust the context window.
+
+## Failure modes, all tested
+
+Absent API (older Chrome), `unavailable` hardware, mid-download, model throwing,
+model returning non-JSON, and model fabricating. Every one degrades to the
+deterministic result with an honest explanation in the panel — never a silent
+stall and never a broken scan.

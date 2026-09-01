@@ -26,7 +26,7 @@ GEO Lens — AEO/GEO Content Auditor
 
 **Summary (short description, max 132 chars)**
 ```
-AI-search content auditor: colour highlights, a scored AEO/GEO audit, and copy-ready rewrites for every issue. 100% local.
+AI-search auditor: colour highlights, a scored AEO/GEO audit, and rewrites written by Chrome's on-device AI. 100% local.
 ```
 
 **Description**
@@ -34,6 +34,13 @@ AI-search content auditor: colour highlights, a scored AEO/GEO audit, and copy-r
 GEO Lens shows you exactly why a page is — or isn't — ready to be cited by AI search: AI Overviews, ChatGPT, Perplexity, and Gemini. Then it writes the fix for you.
 
 Click Scan and GEO Lens analyses the page's prose, highlights problems in colour right where they occur, and opens a side panel with an overall GEO score, four category sub-scores, and — for every issue that can be mechanically corrected — the replacement text, ready to copy.
+
+ON-DEVICE AI THAT ACTUALLY WRITES
+Where a real answer has to be written, GEO Lens uses Chrome's built-in AI (Gemini Nano, Chrome 138+). It runs on your machine — no account, no API key, no network request — so the extension stays 100% local.
+• It writes the direct answer under a question heading, the TL;DR for the top of the article, and the opening sentence that names your subject.
+• It finds what pattern matching can't: a heading whose question is never actually answered, a claim asserted with nothing behind it, and the questions readers arrive with that your page never addresses.
+• Grounded: any rewrite that introduces a statistic absent from your page is discarded automatically, and the mechanical fix kept. It will never invent a number for you to publish.
+• No AI available? Every scan still works — you just get the mechanical fixes.
 
 IT WRITES THE FIX, NOT JUST THE DIAGNOSIS
 • A 200-word wall of text, split into balanced paragraphs at real sentence boundaries.
@@ -51,7 +58,8 @@ WHAT IT CHECKS
 • Entity & E-E-A-T — sourced claims, first-hand experience, entity clarity in the opening.
 • Citability — vague quantifiers, outbound sources, quotable stat-sentences, hedged claims.
 
-TWO MORE VIEWS
+THREE MORE VIEWS
+• Insights — the AI findings above, each explained.
 • Quotable — the sentences an engine is most likely to lift verbatim, ranked and scored. If none qualify, it says so instead of promoting a weak one.
 • Retrieval — how the page splits into chunks for retrieval, and which chunks are orphans: passages that lose their subject when retrieved alone ("It reduced costs by 30%" with no antecedent).
 
@@ -73,7 +81,7 @@ SCOPE
 GEO Lens audits the editorial layer — the prose itself. It deliberately does not check titles, meta descriptions, H1 counts, canonicals, schema validity, hreflang or crawler access; those are on-page and technical SEO, and a dedicated SEO toolkit handles them better.
 
 PRIVACY
-Everything runs locally in your browser. No account, no API key, no network calls, and no data ever leaves the page. GEO Lens requests no broad site access — it only runs when you scan.
+Everything runs locally in your browser, including the AI. No account, no API key, no network calls, and no data ever leaves the page. GEO Lens requests no broad site access — it only runs when you scan.
 
 Built for SEO professionals and content writers optimising for Answer Engine Optimization (AEO) and Generative Engine Optimization (GEO).
 ```
@@ -128,7 +136,9 @@ GEO Lens audits the prose of the page you are viewing for AEO/GEO (AI-search) co
 instead, so it only runs on the tab after an explicit user click.
 
 **Are you using remote code?** `No` — all code is in the package; no external
-scripts are loaded.
+scripts are loaded. The AI features use Chrome's built-in on-device model
+(`LanguageModel`), which ships with the browser and requires no additional
+permission and no network request.
 
 **Data usage disclosures (check these):**
 - Does your item collect or use user data? **You store data locally only.** In

@@ -9,9 +9,11 @@ Built for SEO professionals and content writers auditing pages for **Answer
 Engine Optimization (AEO)** and **Generative Engine Optimization (GEO)**.
 
 - **It writes the fix, not just the diagnosis.** Every mechanically-correctable
-  issue comes with generated replacement text and a Copy button.
-- **100% local.** Every rule runs in your browser. No network calls, no API
-  keys, nothing leaves the tab.
+  issue comes with generated replacement text and a Copy button — and where a
+  real answer has to be *written*, Chrome's built-in on-device model writes it.
+- **100% local — including the AI.** Every rule runs in your browser, and the
+  model is Chrome's built-in Gemini Nano, running on your device. No account, no
+  API key, no network call, nothing leaves the tab.
 - **No build step, no dependencies.** Vanilla JavaScript. Load the folder
   unpacked and it works.
 - **Non-destructive.** Highlights wrap text nodes and are removed cleanly —
@@ -139,9 +141,65 @@ placeholders and says so in its label** — it never invents content.
 
 ---
 
+## Intelligence (on-device)
+
+The transforms above are mechanical: they reorder sentences the page already has
+and strip hedge prefixes. That is the right tool for a paragraph split, and the
+wrong tool for *"write the answer to this heading"* — there the deterministic
+fixer can only emit `[one-sentence answer, under 30 words]` and hand the work
+back to you.
+
+So where a real answer has to be **written**, GEO Lens uses **Chrome's built-in
+Prompt API** (Gemini Nano, Chrome 138+ desktop). It runs on your device: no
+account, no API key, and no network request, so the extension stays 100% local.
+
+**It writes** the direct answer under a question heading, the TL;DR for the top
+of the article, the opening sentence that names the page's subject, and real
+question-heading rewrites.
+
+**It also finds three things no regex can:**
+
+| Finding | Why a heuristic can't do it |
+|---|---|
+| **Question not actually answered** | The mechanical rule measures the first sentence's *length*. A crisp 18-word sentence that talks around the question passes it. This asks whether the question is genuinely resolved. |
+| **Claim asserted without support** | Regex finds `%`. It cannot tell whether the surrounding page substantiates the number. |
+| **Question the page never answers** | Requires knowing what a reader searching this topic actually wants. |
+
+These appear in the **Insights** tab.
+
+### Grounding — the part that matters
+
+This tool's output gets pasted onto real client pages, so a plausible invented
+statistic is far worse than no rewrite at all. Every generation is constrained
+three ways:
+
+1. The system prompt forbids introducing any fact not in the passage.
+2. Output is schema-constrained via `responseConstraint`.
+3. **Any rewrite that introduces a number, percentage or currency figure absent
+   from the source text is discarded**, and the mechanical fix is kept instead.
+
+Bracketed placeholders pass — that is the model correctly declining to guess.
+The Insights tab reports how many generations were accepted and how many were
+rejected for inventing a figure. Rewrites the model wrote are badged **AI** in
+the panel and in the exported report; read them before you publish them.
+
+### When it isn't available
+
+The model needs Chrome 138+ on desktop, and a first run downloads roughly 2 GB.
+When it is unavailable, downloading, or switched off, **every scan still works**
+— you get the deterministic fixes, and the panel says plainly which state it is
+in. The AI never blocks a scan: the mechanical result renders immediately and
+the written rewrites repaint the panel whenever they land.
+
+Turn it off in Settings.
+
+---
+
 ## The three panel views
 
 - **Issues** — every problem, grouped by category, each with its rewrite.
+- **Insights** — the AI-only findings above: unanswered questions, unsupported
+  claims, and reader questions the page never addresses.
 - **Quotable** — the sentences an engine is most likely to lift verbatim, ranked
   and scored, with the reasons each scored well. If nothing qualifies it says
   *"No strong citation candidate on this page"* rather than promoting a weak one.
@@ -236,14 +294,17 @@ geo-lens/
 │   ├── settings.js          DEFAULT_SETTINGS + merge
 │   ├── profiles.js          content-type detection, per-profile rules and weights
 │   ├── rules/               extractability / structure / entity / citability
-│   ├── fixers.js            issue -> corrected text
+│   ├── fixers.js            issue -> corrected text (deterministic)
+│   ├── ai-bridge.js         builds the model's job list, merges its output
 │   ├── quotables.js         citation-candidate ranking
 │   ├── chunks.js            retrieval preview + orphan detection
 │   ├── scanner.js           orchestration, scoring, dismissals, delta
 │   ├── panel.js             Shadow DOM side panel (3 views)
 │   └── panel.css            canonical panel stylesheet
+├── ai/engine.js             on-device Prompt API: prompts, JSON schemas,
+│                            grounding guard, token budget
 ├── report/report-template.js  white-label standalone HTML report
-├── test/harness.js          jsdom acceptance harness (90 checks)
+├── test/harness.js          jsdom acceptance harness (131 checks)
 ├── icons/                   16/32/48/128 PNGs + reproducible generator
 ├── DECISIONS.md             design decisions
 └── README.md
@@ -268,7 +329,8 @@ node harness.js
 Loads the real content scripts into jsdom in the service worker's injection
 order and runs the full pipeline: extraction, profile detection, rules,
 dismissals, scoring, rewrite generation, quotables, chunking, panel render and
-report export. **90 checks, all passing**, including:
+report export, plus the AI engine against a mock model. **131 checks, all
+passing**, including:
 
 - The Schema category is gone and no H1/hierarchy rule fires.
 - Highlighting then clearing restores the article's `innerHTML` **byte-for-byte**.
@@ -283,3 +345,9 @@ report export. **90 checks, all passing**, including:
 - Report branding is HTML-escaped and a `javascript:` accent colour is rejected.
 - `DEFAULT_SETTINGS` in `content/settings.js` and `background.js` stay in step.
 - A re-scan does not stack highlights.
+- **A model that fabricates a statistic has its rewrite discarded** and the
+  mechanical fix kept; the rejection is counted.
+- An absent, unavailable, crashing, or JSON-mangling model degrades cleanly —
+  the scan still completes with deterministic output.
+- Only skeleton-shaped fixes are sent to the model; exact mechanical transforms
+  are never handed to it to degrade.

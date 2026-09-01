@@ -29,6 +29,8 @@
   let shadow = null;
   let currentResult = null;
   let activeTab = 'issues';
+  let aiState = null;      // 'working' | 'downloading' | 'unavailable' | null
+  let aiProgress = 0;
   const toggleState = {};
 
   function el(tag, cls, text) {
@@ -325,8 +327,10 @@
   // ---- tabs ---------------------------------------------------------------
   function buildTabs(result) {
     const strip = el('div', 'tabs');
+    const insightCount = result.ai && result.ai.insights ? result.ai.insights.length : 0;
     const defs = [
       { id: 'issues', label: 'Issues', n: result.issues.length },
+      { id: 'insights', label: 'Insights', n: insightCount },
       { id: 'quotable', label: 'Quotable', n: result.quotables.candidates.length },
       { id: 'retrieval', label: 'Retrieval', n: result.retrieval.orphanCount || result.retrieval.chunks.length },
     ];
@@ -412,6 +416,11 @@
     const box = el('div', 'rewrite');
 
     const head = el('div', 'rw-head');
+    if (iss.rewrite.ai) {
+      const badge = el('span', 'rw-ai', 'AI');
+      badge.title = 'Written by Chrome\u2019s on-device model from this page\u2019s own text. Read it before you publish it.';
+      head.appendChild(badge);
+    }
     head.appendChild(el('span', 'rw-label', iss.rewrite.label));
     const fmt = el('span', 'rw-fmt', iss.rewrite.format);
     head.appendChild(fmt);
@@ -574,6 +583,140 @@
     return wrap;
   }
 
+  // ---- insights view (AI) -------------------------------------------------
+  const INSIGHT_META = {
+    unanswered: {
+      label: 'Question not actually answered',
+      note: 'The heading asks a question the passage beneath it never resolves. Length-based rules miss this — the prose can be short and fluent and still answer nothing.',
+    },
+    unsupported: {
+      label: 'Claim asserted without support',
+      note: 'Stated as fact, with no source, data or reasoning anywhere on the page.',
+    },
+    gap: {
+      label: 'Question the page never answers',
+      note: 'A reader searching this topic arrives wanting this, and leaves without it.',
+    },
+  };
+
+  function buildInsights(result) {
+    const wrap = el('div', 'insights');
+    const ai = result.ai;
+
+    wrap.appendChild(el('div', 'view-intro',
+      'Findings that need reading comprehension rather than pattern matching. Produced by Chrome\u2019s ' +
+      'built-in on-device model \u2014 nothing is sent to a server.'));
+
+    if (!ai) {
+      wrap.appendChild(el('div', 'empty', aiState === 'working'
+        ? 'Reading the page\u2026'
+        : 'The intelligence pass has not run for this scan yet.'));
+      return wrap;
+    }
+
+    if (!ai.available) {
+      wrap.appendChild(buildAiUnavailable(ai));
+      return wrap;
+    }
+
+    if (!ai.insights.length) {
+      const ok = el('div', 'empty');
+      ok.appendChild(el('b', null, 'Nothing flagged'));
+      ok.appendChild(document.createTextNode(
+        'Every question heading is genuinely answered, no unsupported claims stood out, and no obvious reader question is missing.'));
+      wrap.appendChild(ok);
+      return wrap;
+    }
+
+    ai.insights.forEach(function (ins) {
+      const meta = INSIGHT_META[ins.kind] || { label: ins.kind, note: '' };
+      const card = el('div', 'insight ' + ins.kind);
+
+      const head = el('div', 'i-head');
+      head.appendChild(el('span', 'i-kind', meta.label));
+      card.appendChild(head);
+
+      if (ins.kind === 'unanswered') {
+        card.appendChild(el('div', 'i-subject', '\u201c' + ins.heading + '\u201d'));
+        if (ins.detail) card.appendChild(el('div', 'i-detail', ins.detail));
+      } else if (ins.kind === 'unsupported') {
+        card.appendChild(el('div', 'i-quote', '\u201c' + NS.util.snippet(ins.quote, 220) + '\u201d'));
+        if (ins.detail) card.appendChild(el('div', 'i-detail', 'Missing: ' + ins.detail));
+      } else if (ins.kind === 'gap') {
+        card.appendChild(el('div', 'i-subject', ins.question));
+      }
+
+      card.appendChild(el('div', 'i-note', meta.note));
+
+      if (ins.node) {
+        card.classList.add('clickable');
+        card.addEventListener('click', function () {
+          try { ins.node.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+          catch (e) { ins.node.scrollIntoView(); }
+          NS.highlighter.pulse(ins.node);
+        });
+      }
+      wrap.appendChild(card);
+    });
+
+    if (ai.stats) {
+      const s = ai.stats;
+      const foot = el('div', 'i-stats',
+        s.accepted + ' of ' + s.attempted + ' generations accepted' +
+        (s.ungrounded ? ' \u00b7 ' + s.ungrounded + ' rejected for inventing a figure' : '') +
+        (s.failed ? ' \u00b7 ' + s.failed + ' failed' : ''));
+      foot.title = 'A generation that introduces a number absent from the source text is discarded and the mechanical fix is kept instead.';
+      wrap.appendChild(foot);
+    }
+    return wrap;
+  }
+
+  function buildAiUnavailable(ai) {
+    const box = el('div', 'empty');
+    const REASONS = {
+      unsupported: ['On-device AI not available in this browser',
+        'GEO Lens uses Chrome\u2019s built-in Prompt API, which needs Chrome 138 or later on desktop. Everything else in the panel works without it.'],
+      unavailable: ['On-device model unavailable',
+        'Chrome reports the built-in model cannot run here \u2014 usually not enough free disk space or unsupported hardware. Everything else in the panel works without it.'],
+      downloading: ['Model still downloading',
+        'Chrome is fetching the on-device model. Re-scan once it finishes; it is a one-time download.'],
+      off: ['Turned off in Settings',
+        'The intelligence pass is disabled. Enable it in Settings to get written rewrites and semantic checks.'],
+      error: ['The intelligence pass failed', ai.error || 'An unexpected error occurred.'],
+    };
+    const r = REASONS[ai.state] || REASONS.unavailable;
+    box.appendChild(el('b', null, r[0]));
+    box.appendChild(document.createTextNode(r[1]));
+    return box;
+  }
+
+  // ---- AI status strip ----------------------------------------------------
+  function buildAiStrip(result) {
+    if (result.ai && result.ai.available) {
+      if (!result.ai.replaced) return null;
+      const s = el('div', 'ai-strip done');
+      s.appendChild(el('b', null, String(result.ai.replaced)));
+      s.appendChild(document.createTextNode(
+        (result.ai.replaced === 1 ? ' rewrite was' : ' rewrites were') +
+        ' written by the on-device model, replacing the fill-in-the-blank versions.'));
+      return s;
+    }
+    if (aiState === 'downloading') {
+      const s = el('div', 'ai-strip');
+      s.appendChild(el('b', null, 'Downloading the on-device model\u2026 '));
+      s.appendChild(document.createTextNode(
+        Math.round((aiProgress || 0) * 100) + '%. One-time; the panel updates when it finishes.'));
+      return s;
+    }
+    if (aiState === 'working' && !result.ai) {
+      const s = el('div', 'ai-strip');
+      s.appendChild(el('b', null, 'Reading the page\u2026 '));
+      s.appendChild(document.createTextNode('written rewrites and semantic checks will appear shortly.'));
+      return s;
+    }
+    return null;
+  }
+
   // ---- export -------------------------------------------------------------
   function exportReport() {
     if (!NS.lastResult || typeof NS.buildReport !== 'function') return;
@@ -623,6 +766,19 @@
     if (currentResult) render(currentResult, true);
   }
 
+  // Called by the AI bridge when the model's output lands, and while it works.
+  function refresh(result) {
+    if (result && result !== currentResult) currentResult = result;
+    aiState = null;
+    rerender();
+  }
+
+  function setAiState(state, progress) {
+    aiState = state;
+    if (progress != null) aiProgress = progress;
+    if (currentResult) rerender();
+  }
+
   function render(result, keepTab) {
     currentResult = result;
     if (!keepTab) {
@@ -638,6 +794,8 @@
 
     const body = el('div', 'body');
     buildNotices(result).forEach(function (n) { body.appendChild(n); });
+    const strip = buildAiStrip(result);
+    if (strip) body.appendChild(strip);
 
     const counts = {};
     result.issues.forEach(function (i) { counts[i.category] = (counts[i.category] || 0) + 1; });
@@ -646,6 +804,7 @@
 
     if (activeTab === 'quotable') body.appendChild(buildQuotable(result));
     else if (activeTab === 'retrieval') body.appendChild(buildRetrieval(result));
+    else if (activeTab === 'insights') body.appendChild(buildInsights(result));
     else body.appendChild(buildIssues(result));
 
     panel.appendChild(body);
@@ -685,5 +844,11 @@
     currentResult = null;
   }
 
-  NS.panel = { render: render, renderNoContent: renderNoContent, remove: remove };
+  NS.panel = {
+    render: render,
+    renderNoContent: renderNoContent,
+    remove: remove,
+    refresh: refresh,
+    setAiState: setAiState,
+  };
 })();

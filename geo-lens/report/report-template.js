@@ -80,7 +80,8 @@
           (iss.snippet ? '<div class="snippet">&ldquo;' + esc(iss.snippet) + '&rdquo;</div>' : '') +
           '<div class="fix"><b>Fix:</b> ' + esc(iss.fix) + '</div>' +
           (iss.rewrite
-            ? '<div class="rw"><div class="rw-label">' + esc(iss.rewrite.label) +
+            ? '<div class="rw"><div class="rw-label">' +
+              (iss.rewrite.ai ? '<span class="rw-ai">AI</span> ' : '') + esc(iss.rewrite.label) +
               ' <span class="rw-fmt">' + esc(iss.rewrite.format) + '</span></div>' +
               '<pre>' + esc(iss.rewrite.text) + '</pre></div>'
             : '') +
@@ -108,6 +109,34 @@
         }).join('')
       : '<p class="none"><b>No strong citation candidate on this page.</b> None of the ' + q.considered +
         ' sentences scored high enough to be quoted on their own.</p>';
+
+    // ---- AI insights
+    const ai = result.ai;
+    const AI_LABEL = {
+      unanswered: 'Question not actually answered',
+      unsupported: 'Claim asserted without support',
+      gap: 'Question the page never answers',
+    };
+    let insightBlock = '';
+    if (ai && ai.available && ai.insights && ai.insights.length) {
+      insightBlock =
+        '<p class="lead">Findings that need reading comprehension rather than pattern matching, ' +
+        'produced by an on-device model.</p>' +
+        ai.insights.map(function (ins) {
+          const subject = ins.kind === 'unanswered' ? ins.heading
+            : ins.kind === 'gap' ? ins.question
+            : ins.quote;
+          return (
+            '<div class="insight"><div class="i-kind">' + esc(AI_LABEL[ins.kind] || ins.kind) + '</div>' +
+            '<div class="i-subject">' + esc(String(subject || '').slice(0, 300)) + '</div>' +
+            (ins.detail ? '<div class="i-detail">' + esc(ins.detail) + '</div>' : '') +
+            '</div>'
+          );
+        }).join('');
+    } else if (ai && ai.available) {
+      insightBlock = '<p class="none">Nothing flagged: every question heading is genuinely answered, ' +
+        'no unsupported claims stood out, and no obvious reader question is missing.</p>';
+    }
 
     // ---- retrieval preview
     const r = result.retrieval || { chunks: [], orphanCount: 0, tokenBudget: 500 };
@@ -170,6 +199,11 @@
       '.fix{font-size:13px;margin-top:8px}.fix b{color:#16a34a}' +
       '.rw{margin-top:10px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;padding:9px 11px}' +
       '.rw-label{font-size:11.5px;font-weight:700;color:#16a34a;margin-bottom:6px}' +
+      '.rw-ai{font-size:9px;font-weight:800;letter-spacing:.06em;padding:1px 5px;border-radius:4px;background:#4F46E5;color:#fff}' +
+      '.insight{border:1px solid #e5e7eb;border-left:3px solid #4F46E5;border-radius:9px;padding:10px 12px;margin:10px 0;background:#fff}' +
+      '.i-kind{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#6b7280}' +
+      '.i-subject{font-size:14px;font-weight:600;margin-top:4px}' +
+      '.i-detail{font-size:12.5px;color:#4b5563;margin-top:5px}' +
       '.rw-fmt{font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;border:1px solid #e5e7eb;border-radius:4px;padding:0 4px;font-weight:600}' +
       '.rw pre{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.55;white-space:pre-wrap;word-break:break-word}' +
       '.quote{border:1px solid #e5e7eb;border-left:3px solid #A855F7;border-radius:9px;padding:11px 13px;margin:10px 0;background:#fff}' +
@@ -212,6 +246,8 @@
 
       '<div class="card"><div class="brand">Issues, fixes &amp; rewrites</div>' +
       (sections || '<p class="none">No issues detected.</p>') + '</div>' +
+
+      (insightBlock ? '<div class="card"><div class="brand">Editorial insights</div>' + insightBlock + '</div>' : '') +
 
       '<div class="card"><div class="brand">Most citable passages</div>' + quoteBlock + '</div>' +
 

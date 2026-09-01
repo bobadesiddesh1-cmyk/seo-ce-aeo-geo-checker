@@ -29,6 +29,20 @@
   </section>
 
   <section class="card">
+    <h2>Intelligence</h2>
+    <p class="hint">Uses Chrome&rsquo;s built-in on-device model (Chrome 138+, desktop) to write real
+      rewrites instead of fill-in-the-blank skeletons, and to run checks that need reading
+      comprehension. It runs locally &mdash; no account, no API key, and no network request, so the
+      extension stays 100% local. When it isn&rsquo;t available every scan still works; you just get
+      the mechanical fixes.</p>
+    <label class="row">
+      <span class="lbl">Use on-device AI</span>
+      <input type="checkbox" id="ai">
+    </label>
+    <p class="hint" id="aiStatus">Checking availability&hellip;</p>
+  </section>
+
+  <section class="card">
     <h2>Rule thresholds</h2>
     <label class="row">
       <span class="lbl">Wall-of-text paragraph length <em>(words)</em></span>

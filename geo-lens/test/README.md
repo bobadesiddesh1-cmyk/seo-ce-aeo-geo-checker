@@ -5,6 +5,10 @@ service worker injects them, and runs the full pipeline end to end — extractio
 profile detection, rules, dismissals, scoring, rewrite generation, quotables,
 retrieval chunking, panel render and report export.
 
+It also loads `ai/engine.js` into a VM context with a **mock `LanguageModel`**,
+so the whole intelligence pass is exercised without Chrome — including the
+grounding guard that discards a rewrite which invents a statistic.
+
 ```sh
 cd geo-lens/test
 npm install jsdom
