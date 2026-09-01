@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "GEO Lens — AEO/GEO Content Auditor",
-  "version": "1.0.0",
-  "description": "Scan any page for AI-search (AEO/GEO) issues: inline highlights and a scored audit with fixes. 100% local, no data collected.",
-  "permissions": ["activeTab", "scripting", "storage", "downloads"],
+  "version": "2.0.0",
+  "description": "Scan any page for AI-search (AEO/GEO) issues: inline highlights, a scored audit, and copy-ready rewrites. 100% local.",
+  "permissions": ["activeTab", "scripting", "storage", "downloads", "contextMenus"],
   "action": {
     "default_title": "GEO Lens — Scan this page",
     "default_popup": "popup/popup.html",
@@ -22,6 +22,16 @@
   },
   "background": {
     "service_worker": "background.js"
+  },
+  "options_page": "options/options.html",
+  "commands": {
+    "scan-page": {
+      "suggested_key": {
+        "default": "Alt+Shift+G",
+        "mac": "Alt+Shift+G"
+      },
+      "description": "Scan the current page with GEO Lens"
+    }
   },
   "web_accessible_resources": [
     {

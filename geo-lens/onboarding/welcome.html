@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Welcome to GEO Lens</title>
+  <style>
+    :root { --bg:#f3f4f6; --card:#fff; --text:#16181d; --dim:#5b6572; --border:#e2e5ea; --accent:#4F46E5; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg:#101216; --card:#181b21; --text:#eceef2; --dim:#9aa4b2; --border:#2c313b; }
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); line-height:1.55;
+      font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+      padding:48px 20px 80px; }
+    .wrap { max-width:720px; margin:0 auto; }
+    h1 { font-size:28px; letter-spacing:-0.01em; }
+    .sub { color:var(--dim); font-size:15px; margin-top:8px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:22px 24px; margin-top:20px; }
+    h2 { font-size:15px; margin-bottom:10px; }
+    ol { margin-left:18px; }
+    li { margin-bottom:8px; font-size:14px; }
+    .legend { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-top:6px; }
+    .cat { display:flex; gap:10px; align-items:flex-start; }
+    .sw { width:14px; height:14px; border-radius:4px; flex:0 0 auto; margin-top:3px; }
+    .cat b { font-size:13px; display:block; }
+    .cat span { font-size:12.5px; color:var(--dim); }
+    .kbd { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12px;
+      border:1px solid var(--border); border-radius:5px; padding:2px 6px; background:var(--bg); }
+    .note { font-size:13px; color:var(--dim); margin-top:14px; }
+    a { color:var(--accent); }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>GEO Lens is installed</h1>
+  <p class="sub">It shows you which sentences on a page are holding it back from being cited by AI search — and gives you the corrected text to paste in.</p>
+
+  <div class="card">
+    <h2>Run your first scan</h2>
+    <ol>
+      <li>Open any article or blog post.</li>
+      <li>Click the GEO Lens icon, or press <span class="kbd">Alt</span> + <span class="kbd">Shift</span> + <span class="kbd">G</span>, or right-click the page and choose <b>Scan this page with GEO Lens</b>.</li>
+      <li>Problems are highlighted in colour, right where they occur, and the side panel explains each one.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>What the four colours mean</h2>
+    <div class="legend">
+      <div class="cat"><span class="sw" style="background:#EF4444"></span><div><b>Extractability</b><span>Can an engine lift a direct answer out of the prose?</span></div></div>
+      <div class="cat"><span class="sw" style="background:#F97316"></span><div><b>Structure</b><span>Question headings, lists, comparison tables, jump links.</span></div></div>
+      <div class="cat"><span class="sw" style="background:#EAB308"></span><div><b>Entity &amp; E-E-A-T</b><span>Sourced claims, first-hand experience, entity clarity.</span></div></div>
+      <div class="cat"><span class="sw" style="background:#A855F7"></span><div><b>Citability</b><span>Are individual sentences quotable and confident?</span></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>The three panel views</h2>
+    <ol>
+      <li><b>Issues</b> — every problem, with a generated rewrite you can copy.</li>
+      <li><b>Quotable</b> — the sentences an engine is most likely to cite verbatim. If none qualify, it says so.</li>
+      <li><b>Retrieval</b> — how the page splits into chunks, and which chunks lose their subject when retrieved alone.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>Scope</h2>
+    <p style="font-size:14px">GEO Lens covers the <b>editorial</b> layer only — the prose itself. It deliberately does not check titles, meta descriptions, H1 counts, canonicals, schema validity or crawler access; those are on-page and technical SEO, and a dedicated SEO toolkit handles them better.</p>
+    <p class="note">Everything runs locally in your browser. No account, no API key, no network requests, nothing leaves the page. Thresholds and report branding are in <a href="../options/options.html">Settings</a>.</p>
+  </div>
+</div>
+</body>
+</html>

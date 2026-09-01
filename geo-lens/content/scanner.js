@@ -1,11 +1,16 @@
 /*
- * scanner.js — orchestrates a scan: extract the main content, build the shared
- * context, run all five rules, score, apply capped highlights, and render the
- * panel. Loaded last. Exposes window.__GEOLens.run() / .clear().
+ * scanner.js — orchestrates a scan: extract the main content, resolve the
+ * content-type profile, build the shared context, run the rules, drop disabled
+ * and dismissed issues, score with an auditable breakdown, generate the
+ * rewrites, extract quotable passages, build the retrieval preview, diff
+ * against the previous scan, apply capped highlights and render the panel.
  *
- * run() returns a JSON-serializable summary (no DOM nodes) so the background
- * service worker can store it; the full result (with node refs) lives on
- * window.__GEOLens.lastResult for the panel and the report exporter.
+ * Loaded last. Exposes window.__GEOLens.run(options) / .clear().
+ *
+ * run() takes its settings, dismissals and previous scan from the service
+ * worker rather than reading storage itself, so the content world stays
+ * synchronous. It returns a JSON-serializable summary (no DOM nodes); the full
+ * result (with node refs) lives on window.__GEOLens.lastResult.
  */
 (function () {
   'use strict';
@@ -15,8 +20,6 @@
   const WORD_BUDGET = 50000;
   const MAX_PARAGRAPHS = 1200;
   const SEVERITY_RANK = { High: 0, Medium: 1, Low: 2 };
-  const DEDUCTION = { High: 15, Medium: 8, Low: 3 };
-  const MAX_HIGHLIGHTS = 60;
 
   function textLen(el) {
     return el ? (el.textContent || '').replace(/\s+/g, ' ').trim().length : 0;
@@ -51,7 +54,6 @@
       if (len > bestLen) { bestLen = len; best = el; }
     });
     if (!best || bestLen < 200) return null;
-    // Tighten: descend while a single child still holds ~all of the text.
     let node = best;
     for (let guard = 0; guard < 20; guard++) {
       let chosen = null;
@@ -82,10 +84,10 @@
   }
 
   // ---- JSON-LD ------------------------------------------------------------
+  // Read only to classify the page (profile detection) and to confirm entity
+  // signals. Schema VALIDATION is out of scope — SEO Sidekick owns it.
   function parseJsonLd() {
     const scripts = document.querySelectorAll('script[type="application/ld+json"]');
-    const nodes = [];
-    const errors = [];
     const typeSet = new Set();
     let hasAuthor = false;
     let hasDate = false;
@@ -94,7 +96,6 @@
       if (!d || typeof d !== 'object') return;
       if (Array.isArray(d)) { d.forEach(collect); return; }
       if (d['@type']) {
-        nodes.push(d);
         const t = d['@type'];
         (Array.isArray(t) ? t : [t]).forEach(function (x) { typeSet.add(String(x).toLowerCase()); });
       }
@@ -109,17 +110,25 @@
     scripts.forEach(function (s) {
       const raw = (s.textContent || '').trim();
       if (!raw) return;
-      let data;
-      try { data = JSON.parse(raw); }
-      catch (e) { errors.push({ text: raw.slice(0, 200), error: e.message }); return; }
-      collect(data);
+      try { collect(JSON.parse(raw)); } catch (e) { /* malformed JSON-LD is Sidekick's report, not ours */ }
     });
 
-    return { scriptCount: scripts.length, nodes: nodes, errors: errors, typeSet: typeSet, hasAuthor: hasAuthor, hasDate: hasDate };
+    return { typeSet: typeSet, hasAuthor: hasAuthor, hasDate: hasDate };
+  }
+
+  // ---- language -----------------------------------------------------------
+  // Every prose heuristic here (sentence splitting, question words, hedges,
+  // filler openers) is English-only. Saying so is better than silently scoring
+  // another language against English rules.
+  function detectLanguage() {
+    const raw = (document.documentElement.getAttribute('lang') || '').trim().toLowerCase();
+    const base = raw.split('-')[0];
+    if (!raw) return { lang: '', english: true, declared: false };
+    return { lang: raw, english: base === 'en', declared: true };
   }
 
   // ---- context ------------------------------------------------------------
-  function buildContext(root) {
+  function buildContext(root, settings) {
     const U = NS.util;
     const headingEls = root.querySelectorAll('h1, h2, h3, h4, h5, h6');
     const headings = [];
@@ -153,9 +162,7 @@
       plainText = U.words(plainText).slice(0, WORD_BUDGET).join(' ');
     }
 
-    const isArticleLike = !!document.querySelector('article') || (!!h1El && paragraphs.length >= 3);
-
-    return {
+    const ctx = {
       root: root,
       doc: document,
       url: location.href,
@@ -167,30 +174,56 @@
       plainText: plainText,
       wordCount: Math.min(totalWords, WORD_BUDGET),
       truncated: truncated,
-      isArticleLike: isArticleLike,
       jsonLd: parseJsonLd(),
+      settings: settings,
+      language: detectLanguage(),
     };
+    ctx.primaryEntity = NS.primaryEntity ? NS.primaryEntity(ctx) : '';
+    return ctx;
+  }
+
+  // ---- fingerprints -------------------------------------------------------
+  // Stable across re-scans of the same page so revision tracking can tell which
+  // issues were fixed, and so a dismissal survives a reload.
+  function hash(str) {
+    let h = 5381;
+    for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+    return (h >>> 0).toString(36);
+  }
+
+  function fingerprint(iss) {
+    const snip = (iss.snippet || '').toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 60);
+    return iss.ruleId + ':' + hash(snip);
   }
 
   // ---- scoring ------------------------------------------------------------
-  function computeScores(issues) {
+  function computeScores(issues, profile, settings) {
+    const deduction = settings.deductions || { High: 15, Medium: 8, Low: 3 };
     const categories = {};
-    NS.CATEGORY_ORDER.forEach(function (c) { categories[c] = 100; });
+    const breakdown = {};
+    NS.CATEGORY_ORDER.forEach(function (c) { categories[c] = 100; breakdown[c] = []; });
+
     issues.forEach(function (i) {
-      categories[i.category] -= (DEDUCTION[i.severity] || 0);
+      const pts = deduction[i.severity] || 0;
+      categories[i.category] -= pts;
+      breakdown[i.category].push({ ruleId: i.ruleId, severity: i.severity, points: pts });
     });
+
+    const weights = (profile && profile.weights) || {};
     let overall = 0;
     NS.CATEGORY_ORDER.forEach(function (c) {
       categories[c] = Math.max(0, categories[c]);
-      overall += categories[c] * NS.CATEGORY_META[c].weight;
+      const w = weights[c] != null ? weights[c] : NS.CATEGORY_META[c].weight;
+      overall += categories[c] * w;
     });
     overall = Math.round(overall);
     const grade = overall >= 85 ? 'A' : overall >= 70 ? 'B' : overall >= 55 ? 'C' : overall >= 40 ? 'D' : 'F';
-    return { overall: overall, grade: grade, categories: categories };
+    return { overall: overall, grade: grade, categories: categories, breakdown: breakdown, weights: weights };
   }
 
-  // ---- highlight application (cap 60, highest severity first) --------------
-  function applyHighlights(issues) {
+  // ---- highlight application ----------------------------------------------
+  function applyHighlights(issues, settings) {
+    const cap = settings.maxHighlights || 60;
     const order = issues
       .map(function (iss, idx) { return { iss: iss, idx: idx }; })
       .sort(function (a, b) {
@@ -201,12 +234,30 @@
     order.forEach(function (o) {
       const iss = o.iss;
       if (!iss.node) { iss.highlighted = false; return; }
-      if (used >= MAX_HIGHLIGHTS) { iss.highlighted = false; return; }
+      if (used >= cap) { iss.highlighted = false; return; }
       const ok = NS.highlighter.highlightSnippetInElement(iss.node, iss.snippet, iss.category, iss.id);
       iss.highlighted = !!ok;
       if (ok) used++;
     });
     return used;
+  }
+
+  // ---- revision delta -----------------------------------------------------
+  function buildDelta(previous, issues, scoring) {
+    if (!previous || previous.score == null) return null;
+    const now = {};
+    issues.forEach(function (i) { now[i.fingerprint] = true; });
+    const before = Array.isArray(previous.fingerprints) ? previous.fingerprints : [];
+    const fixed = before.filter(function (f) { return !now[f]; });
+    const introduced = issues.filter(function (i) { return before.indexOf(i.fingerprint) === -1; });
+    return {
+      previousScore: previous.score,
+      previousGrade: previous.grade,
+      previousTimestamp: previous.timestamp,
+      scoreDelta: scoring.overall - previous.score,
+      fixedCount: fixed.length,
+      introducedCount: before.length ? introduced.length : 0,
+    };
   }
 
   // ---- serializable summary ----------------------------------------------
@@ -220,7 +271,14 @@
       categories: result.scoring.categories,
       issueCount: result.issues.length,
       highlightedCount: result.issues.filter(function (i) { return i.highlighted; }).length,
+      fingerprints: result.issues.map(function (i) { return i.fingerprint; }),
+      profile: result.profile.id,
+      profileLabel: result.profile.label,
+      quotableCount: result.quotables.candidates.length,
+      orphanCount: result.retrieval.orphanCount,
+      wordCount: result.wordCount,
       truncated: result.truncated,
+      delta: result.delta,
       noContent: false,
     };
   }
@@ -232,32 +290,58 @@
     NS.lastResult = null;
   }
 
-  function run() {
+  function run(options) {
     clear();
+    const opts = options || {};
+    const settings = NS.mergeSettings(opts.settings);
+
     const root = extractContent();
     if (!root) {
       const summary = { url: location.href, title: document.title, timestamp: Date.now(), noContent: true };
       if (NS.panel) NS.panel.renderNoContent(summary);
       return summary;
     }
-    const ctx = buildContext(root);
 
-    const issues = [];
+    const ctx = buildContext(root, settings);
+    const resolved = NS.profiles.resolve(ctx, settings);
+    const profile = resolved.profile;
+    ctx.profile = profile;
+
+    // ---- rules
+    const raw = [];
     NS.CATEGORY_ORDER.forEach(function (cat) {
       const fn = NS.rules[cat];
       if (typeof fn !== 'function') return;
       try {
-        const found = fn(ctx) || [];
-        found.forEach(function (i) { issues.push(i); });
+        (fn(ctx) || []).forEach(function (i) { raw.push(i); });
       } catch (e) {
         // A failing rule must never abort the whole scan.
         console.warn('GEO Lens: rule "' + cat + '" failed', e);
       }
     });
+
+    // ---- profile suppression + dismissals
+    const dismissedRules = opts.dismissedRules || [];
+    const dismissedIssues = opts.dismissedIssues || [];
+    const suppressed = { profile: 0, rule: 0, issue: 0 };
+
+    const issues = [];
+    raw.forEach(function (iss) {
+      iss.fingerprint = fingerprint(iss);
+      if (profile.disabled.indexOf(iss.ruleId) !== -1) { suppressed.profile++; return; }
+      if (dismissedRules.indexOf(iss.ruleId) !== -1) { suppressed.rule++; return; }
+      if (dismissedIssues.indexOf(iss.fingerprint) !== -1) { suppressed.issue++; return; }
+      issues.push(iss);
+    });
     issues.forEach(function (iss, idx) { iss.id = iss.category + '-' + idx; });
 
-    const scoring = computeScores(issues);
-    applyHighlights(issues);
+    // ---- rewrites
+    issues.forEach(function (iss) {
+      iss.rewrite = NS.fixers ? NS.fixers.generate(iss, ctx) : null;
+    });
+
+    const scoring = computeScores(issues, profile, settings);
+    applyHighlights(issues, settings);
 
     const result = {
       url: ctx.url,
@@ -265,9 +349,20 @@
       timestamp: Date.now(),
       wordCount: ctx.wordCount,
       truncated: ctx.truncated,
+      language: ctx.language,
+      primaryEntity: ctx.primaryEntity,
+      profile: profile,
+      profileReason: resolved.reason,
+      suppressed: suppressed,
       scoring: scoring,
       issues: issues,
+      quotables: NS.quotables.extract(ctx),
+      retrieval: NS.chunks.build(ctx),
+      branding: settings.branding,
+      delta: null,
     };
+    result.delta = buildDelta(opts.previous, issues, scoring);
+
     NS.lastResult = result;
     if (NS.panel) NS.panel.render(result);
     return summarize(result);
@@ -275,4 +370,5 @@
 
   NS.run = run;
   NS.clear = clear;
+  NS.fingerprint = fingerprint;
 })();
